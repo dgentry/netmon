@@ -4,7 +4,7 @@ import subprocess
 import time
 from time import sleep
 
-from log import log, RED, WHT, GRN, YEL
+from log import log, log_add, RED, WHT, GRN, YEL
 
 # Named Constants
 
@@ -27,6 +27,8 @@ Write_Api_Key = 'WWWWWWWWWWWWWWWW'
 
 Report_File = "netmon.log"
 
+# Delete the following line if you put your keys above
+import my_api_keys
 
 def send_tweet(message):
     Tweet_Path = "apps/thingtweet/1/statuses/update"
