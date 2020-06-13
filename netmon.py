@@ -4,7 +4,7 @@ import subprocess
 import time
 from time import sleep
 
-from log import log, log_add, RED, WHT, GRN, YEL
+from log import log, log_add, now, RED, WHT, GRN, YEL
 
 # Named Constants
 
@@ -19,36 +19,40 @@ smallest_outage_to_report = 30 # seconds
 #Tweet_To = "@ask_spectrum"
 My_City = "SomeCity"
 
-Thingspeak_Host = "api.thingspeak.com"
 # replace 'K' sequence by your API_KEY of ThingTweet
 Api_Key = 'KKKKKKKKKKKKKKKK'
 # replace 'W' sequence by your WriteAPIKey (from your thingSpeak channel settings)
 Write_Api_Key = 'WWWWWWWWWWWWWWWW'
+Thingspeak_Host = "api.thingspeak.com"
+Tweet_Path = "apps/thingtweet/1/statuses/update"
+Thingspeak_Path = "/update"
 
 Report_File = "netmon.log"
 
 # Delete the following line if you put your keys above
-import my_api_keys
+from my_api_keys import Tweet_To, My_City, Api_Key, Write_Api_Key
+
 
 def send_tweet(message):
-    Tweet_Path = "apps/thingtweet/1/statuses/update"
     payload = {'api_key': Api_Key, 'status': message}
     r = requests.post(f"https://{Thingspeak_Host}/{Tweet_Path}", params=payload)
+    if r.status_code != 200:
+        log("Tweet fail {repr(r)}.")
 
-def send_down_tweet(duration, My_City):
-    send_tweet(f"{tweet_to}, internet was down: {str(duration)} s."
-              f"I'm in {My_City}. #DownTimeDetected")
+def send_down_tweet(duration):
+    send_tweet(f"{Tweet_To}, internet was down: {str(duration)} s."
+               f"I'm in {My_City}. #DownTimeDetected")
 
 def send_start_tweet():
-    send_tweet("Downtime monitor was started.")
+    send_tweet(f"Downtime monitor started {now()}.")
 
 def send_thingspeak(duration):
-    args = {'field1': str(duration), 'key': write_api_key}
+    args = {'field1': str(duration), 'key': Write_Api_Key}
     headers = {
         "Content-type": "application/x-www-form-urlencoded",
         "Accept": "text/plain"}
-    path = "/update"
-    r = requests.post(f"https://{thingspeak_host}/{path}", params=args, headers=headers)
+    r = requests.post(f"https://{Thingspeak_Host}/{Thingspeak_Path}",
+                      params=args, headers=headers)
 
 
 def host_down(host):
@@ -77,7 +81,6 @@ def check_down(local, internet):
     """Returns (True, '') if internet is down, (False, latency) if up,
     None if it's not possible to check because the local net is down.
     """
-
     inet_down, inet_latency = host_down(internet)
     if inet_down:
         # Internet seems down, but are we even locally connected?
@@ -96,7 +99,6 @@ if __name__ == "__main__":
     attempt_num = 0
     was_offline = False
     start_of_outage = 0
-    total_downtime = 0
     outage_count = 0
 
     while True:
@@ -130,13 +132,15 @@ if __name__ == "__main__":
 
         # Internet came up after previous check
         if not is_down and was_offline:
-            total_downtime = round(time.time() - start_of_outage, 1)
+            # 3 digits after decimal makes tweet slightly less likely
+            # to be duplicate.  Twitter blocks duplicate tweets.
+            downtime = round(time.time() - start_of_outage, 3)
             outage_count = outage_count + 1
             was_offline = False
 
-            if (total_downtime > smallest_outage_to_report):
-                dt_str = log(f"DownTime above limit: {total_downtime} s offline\n")
+            send_thing_speak(downtime)
+            if (downtime > smallest_outage_to_report):
+                dt_str = log(f"Outage above limit: {downtime} s\n")
                 with open(DowntimeReportFile, "a") as TxtFile:
                     TxtFile.write(dt_str)
-                SendTweet(total_downtime)
-            SendThingSpeak(total_downtime)
+                send_tweet(downtime)
