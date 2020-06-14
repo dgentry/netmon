@@ -138,7 +138,7 @@ if __name__ == "__main__":
             outage_count = outage_count + 1
             was_offline = False
 
-            send_thing_speak(downtime)
+            send_thingspeak(downtime)
             if (downtime > smallest_outage_to_report):
                 dt_str = log(f"Outage above limit: {downtime} s\n")
                 with open(DowntimeReportFile, "a") as TxtFile:
