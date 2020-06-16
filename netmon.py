@@ -44,7 +44,10 @@ def send_down_tweet(duration):
                f"I'm in {My_City}. #DownTimeDetected")
 
 def send_start_tweet():
-    send_tweet(f"Downtime monitor started {now()}.")
+    try:
+        send_tweet(f"Downtime monitor started {now()}.")
+    except Exception as e:
+        log(f"Couldn't send startup tweet.  Continuing.  ({e})")
 
 def send_thingspeak(duration):
     args = {'field1': str(duration), 'key': Write_Api_Key}
