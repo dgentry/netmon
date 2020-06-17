@@ -144,6 +144,6 @@ if __name__ == "__main__":
             send_thingspeak(downtime)
             if (downtime > smallest_outage_to_report):
                 dt_str = log(f"Outage above limit: {downtime} s\n")
-                with open(DowntimeReportFile, "a") as TxtFile:
+                with open(Report_File, "a") as TxtFile:
                     TxtFile.write(dt_str)
                 send_tweet(downtime)
