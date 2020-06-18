@@ -10,7 +10,7 @@ from log import log, log_add, now, RED, WHT, GRN, YEL
 
 # A local host that should always be up (ideally, the gateway router)
 Local_Host = "192.168.1.1"
-# The internet host that should always be up (Google DNS,for example)
+# An internet host that should always be up (Google DNS,for example)
 Internet_Host = "8.8.8.8"
 
 smallest_outage_to_report = 30 # seconds
@@ -35,7 +35,10 @@ from my_api_keys import Tweet_To, My_City, Api_Key, Write_Api_Key
 
 def send_tweet(message):
     payload = {'api_key': Api_Key, 'status': message}
-    r = requests.post(f"https://{Thingspeak_Host}/{Tweet_Path}", params=payload)
+    try:
+        r = requests.post(f"https://{Thingspeak_Host}/{Tweet_Path}", params=payload)
+    except Exception as e:
+        log(f"Couldn't send tweet \"{message}\".  Continuing.  ({e})")
     if r.status_code != 200:
         log("Tweet fail {repr(r)}.")
 
@@ -44,18 +47,19 @@ def send_down_tweet(duration):
                f"I'm in {My_City}. #DownTimeDetected")
 
 def send_start_tweet():
-    try:
-        send_tweet(f"Downtime monitor started {now()}.")
-    except Exception as e:
-        log(f"Couldn't send startup tweet.  Continuing.  ({e})")
+    send_tweet(f"Downtime monitor started {now()}.")
 
 def send_thingspeak(duration):
     args = {'field1': str(duration), 'key': Write_Api_Key}
     headers = {
         "Content-type": "application/x-www-form-urlencoded",
         "Accept": "text/plain"}
-    r = requests.post(f"https://{Thingspeak_Host}/{Thingspeak_Path}",
-                      params=args, headers=headers)
+    try:
+        r = requests.post(f"https://{Thingspeak_Host}/{Thingspeak_Path}",
+                          params=args, headers=headers)
+    except Exception as e:
+        log(f"Couldn't post to thingspeak \"{duration}\".  Continuing.  ({e})")
+
 
 
 def host_down(host):
@@ -120,7 +124,7 @@ if __name__ == "__main__":
             exit(1)
 
         if is_down is None:
-            print(f"{now()}: Disconnected from local network.")
+            log_add(f"{now()}: Disconnect on local network.")
             continue
         elif is_down:
             log_add(f"{WHT}Internet is {RED}down...")
@@ -143,7 +147,7 @@ if __name__ == "__main__":
 
             send_thingspeak(downtime)
             if (downtime > smallest_outage_to_report):
-                dt_str = log(f"Outage above limit: {downtime} s\n")
+                dt_str = log(f"Outage above {smallest_outage_to_report} s: {downtime} s\n")
                 with open(Report_File, "a") as TxtFile:
                     TxtFile.write(dt_str)
                 send_tweet(downtime)
