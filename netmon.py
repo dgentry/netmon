@@ -43,7 +43,7 @@ def send_tweet(message):
         log("Tweet fail {repr(r)}.")
 
 def send_down_tweet(duration):
-    send_tweet(f"{Tweet_To}, internet was down: {str(duration)} s."
+     send_tweet(f"{Tweet_To}, internet was down: {str(duration)} s.  "
                f"I'm in {My_City}. #DownTimeDetected")
 
 def send_start_tweet():
@@ -71,7 +71,7 @@ def host_down(host):
         r = subprocess.run(f"ping -c 1 {host}",
                            shell=True, stdout=pipe, stderr=pipe)
     except subprocess.CalledProcessError as err:
-        print('ERROR:', err)
+        log(f'{RED}FATAL ERROR.  Exiting: {err}')
         exit(1)
     else:
         output = r.stdout.decode('utf-8')
@@ -90,6 +90,12 @@ def check_down(local, internet):
     """
     inet_down, inet_latency = host_down(internet)
     if inet_down:
+        # 2nd chance check in case it was just one lost packet
+        inet_down, inet_latency = host_down(internet)
+        if not inet_down:
+            log("hiccup")
+            return (inet_down, inet_latency)
+
         # Internet seems down, but are we even locally connected?
         local_down, local_latency = host_down(local)
         if local_down:
@@ -107,11 +113,13 @@ if __name__ == "__main__":
     was_offline = False
     start_of_outage = 0
     outage_count = 0
+    long_outage_count = 0
 
     while True:
         attempt_num += 1
         latency = ''
-        log(f"{YEL}#{attempt_num}, {outage_count} outage(s).  ", end="")
+        log(f"{YEL}#{attempt_num}, {long_outage_count}/{outage_count} "
+            "short/long outage(s).  ", end="")
         try:
             is_down, latency = check_down(Local_Host, Internet_Host)
             sleep(5)
@@ -139,15 +147,16 @@ if __name__ == "__main__":
 
         # Internet came up after previous check
         if not is_down and was_offline:
-            # 3 digits after decimal makes tweet slightly less likely
+            # 2 digits after decimal makes tweet slightly less likely
             # to be duplicate.  Twitter blocks duplicate tweets.
-            downtime = round(time.time() - start_of_outage, 3)
-            outage_count = outage_count + 1
+            downtime = round(time.time() - start_of_outage, 2)
+            outage_count += 1
             was_offline = False
 
             send_thingspeak(downtime)
             if (downtime > smallest_outage_to_report):
+                long_outage_count += 1
                 dt_str = log(f"Outage above {smallest_outage_to_report} s: {downtime} s\n")
                 with open(Report_File, "a") as TxtFile:
                     TxtFile.write(dt_str)
-                send_tweet(downtime)
+                send_down_tweet(downtime)
